@@ -1,0 +1,70 @@
+from "ecc/babyjubjubParams" import BabyJubJubParams;
+
+import "utils/pack/bool/nonStrictUnpack256" as unpack256;
+import "hashes/sha256/512bitPacked" as sha256packed;
+import "ecc/edwardsScalarMult" as multiply;
+import "ecc/edwardsOnCurve" as onCurve;
+import "ecc/edwardsAdd" as add;
+
+
+const BabyJubJubParams context = BabyJubJubParams {
+    // Order of the curve for reference: 21888242871839275222246405745257275088614511777268538073601725287587578984328
+    JUBJUB_C: 8, // Cofactor
+    JUBJUB_A: 168700, // Coefficient A
+    JUBJUB_D: 168696, // Coefficient D
+
+    // Montgomery parameters
+    MONT_A: 168698,
+    MONT_B: 1,
+
+    // Point at infinity
+    INFINITY: [0, 1],
+
+    // Generator
+    Gu: 16540640123574156134436876038791482806971768689494387082833631921987005038935,
+    Gv: 20819045374670962167435360035096875258406992893633759881276124905556507972311
+};
+
+const field[2] G = [context.Gu, context.Gv];
+
+// getPK is a function that multiplies a scalar with the group generator
+// receives the generator and the scalar 'x'
+// returns a (x,y) coordinate of a pk on BabyJubJub
+def getPk(field[2] generator, field sk) -> field[2]{
+
+    bool[256] skBits = unpack256(sk);
+    
+    return multiply(skBits, generator, context);
+}
+
+// HashIt calculates a hash digest
+// receives 4 field elements (a, b, c, d)
+// returns the SHA-256 hash digest as field[2]
+def HashIt(field[4] x) -> field[2]{
+
+    field[2] h = sha256packed([x[0], x[1], x[2], x[3]]);
+
+    return h;
+}
+
+// TODO: Add function that parses more digits from the hash onto the sk variable
+// right now, I believe we're just using 128 bits
+
+// "I know a secret value 'x' such that its hash results in this public key
+def main(private field[4] x, public field[2] pubkey){
+
+    // hash x to obtain secret key
+    field[2] sk = HashIt(x);
+
+    // obtain public key (we use only sk[1] because of 
+    field[2] pk = getPk(G, sk[1]);
+
+    // check if obtained pk matches the passed pubkey
+    assert(pubkey == pk);
+
+    return ;
+}
+
+
+// test params: x  = ["18302", "44523211", "111002", "19567888"]
+// test params: pk = ["10412161547698956258038059765489525849459665113799472948098334717013100506020", "17550097596701954867231513627940548392738066486541894919811686730899966144591"]
