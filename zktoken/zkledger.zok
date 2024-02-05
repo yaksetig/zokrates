@@ -1,0 +1,140 @@
+import "utils/pack/bool/nonStrictUnpack256" as unpack256;
+import "hashes/sha256/512bitPacked" as sha256packed;
+import "ecc/edwardsOnCurve" as onCurve;
+import "ecc/edwardsScalarMult" as multiply;
+
+import "ecc/edwardsAdd" as add;
+
+from "ecc/babyjubjubParams" import BabyJubJubParams;
+
+
+const BabyJubJubParams context = BabyJubJubParams {
+    // Order of the curve for reference: 21888242871839275222246405745257275088614511777268538073601725287587578984328
+    JUBJUB_C: 8, // Cofactor
+    JUBJUB_A: 168700, // Coefficient A
+    JUBJUB_D: 168696, // Coefficient D
+
+    // Montgomery parameters
+    MONT_A: 168698,
+    MONT_B: 1,
+
+    // Point at infinity
+    INFINITY: [0, 1],
+
+    // Generator
+    Gu: 16540640123574156134436876038791482806971768689494387082833631921987005038935,
+    Gv: 20819045374670962167435360035096875258406992893633759881276124905556507972311
+};
+
+const field[2] G = [context.Gu, context.Gv];
+
+const field[2] H = [context.Gu, context.Gv];
+
+
+// getPK is a function that multiplies a scalar with the group generator
+// receives the generator and the scalar 'x'
+// returns a (x,y) coordinate 
+def getPk(field[2] generator, field x) -> field[2]{
+
+    bool[256] xBits = unpack256(x);
+    
+    return multiply(xBits, generator, context);
+}
+
+
+// PedersenCommitment is a function that calculates a Pedersen commitment
+// 
+def PedersenCommitment(field v, field r)->field[2]{
+
+    // Calculate v*G
+    field[2] vG = getPk(G, v);
+
+    // Calculate r*H 
+    field[2] rH = getPk(H, r);
+
+    // Calculate vG + rH
+    field[2] commit = add(vG, rH, context);
+    
+    return commit;
+}
+
+def KnowledgeOfSK(field sk, field[2] pk) -> bool{
+
+    field[2] publickey = getPk(G, sk);
+
+    // compare publickey and pk
+    bool ok = (publickey[0] == pk[0]) && (publickey[1] == pk[1]);
+
+    return ok;
+}
+
+// SumPedersenCommits calculates the sum of an array of Pedersen commitments
+// receives an array of commitments
+// returns the total sum in a single commitment
+def SumPedersenCommits<N>(field[N][2] commits) -> field[2] {
+
+    field[2] mut result_commit = [0, 0];
+    
+    for u32 i in 0..N {
+        result_commit = add(result_commit, commits[i], context);
+    }
+
+    return result_commit;
+}
+
+
+
+def CheckRange (field range, field[2] commitment, field v, field r) -> bool {
+
+    bool ok = true; 
+
+    bool mut status = false; 
+
+    // Range Check
+    status = if (v > 0 && v < range) { true } else{ false };
+
+    // Obtain Pedersen commitment
+    field[2] commit = PedersenCommitment(v, r); 
+
+    // Check if obtained commitment is status to the passed to the function
+    status = (commitment[0] == commit[0]) && (commitment[1] == commit[1]);
+
+    // Check if operation status is ok
+    assert(status == ok);
+
+    return status;
+}
+
+
+// [ "5246806097099730076803188083651157024103965267728609001606023395161490743396", "8354011789185939030802845280981367634351692071444027853609377909845895416940"]
+def main(field range, field[2] commitment, private field v, private field r) {
+
+    bool ok = true; 
+
+    bool mut status = false; 
+
+    // Range Check
+    status = if (v > 0 && v < range) { true } else{ false };
+
+    // Obtain Pedersen commitment
+    field[2] commit = PedersenCommitment(v, r); 
+
+    // Check if obtained commitment is status to the passed to the function
+    bool status = (commitment[0] == commit[0]) && (commitment[1] == commit[1]);
+
+    // Check if operation status is ok
+    assert(status == ok);
+
+    return ;
+
+
+
+
+    // bank id (array index)
+    // list of pks (for transactions)
+    // list of commits with each pk 
+    // R token (for audit) [probably not needed]
+    // v - unencrypted value
+
+    // 
+}
