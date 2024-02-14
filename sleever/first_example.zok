@@ -48,7 +48,7 @@ def HashIt(field[4] x) -> field[2]{
 }
 
 // TODO: Add function that parses more digits from the hash onto the sk variable
-// right now, I believe we're just using 128 bits
+// right now, I believe we're just using ~128 bits
 
 // "I know a secret value 'x' such that its hash results in this public key
 def main(private field[4] x, public field[2] pubkey){
