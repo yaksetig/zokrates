@@ -3,8 +3,6 @@ import "hashes/sha256/512bitPacked" as sha256packed;
 import "ecc/edwardsOnCurve" as onCurve;
 import "ecc/edwardsScalarMult" as multiply;
 
-import "hashes/sha3/224bit" as sha3_224;
-
 import "ecc/edwardsAdd" as add;
 
 from "ecc/babyjubjubParams" import BabyJubJubParams;
@@ -34,6 +32,7 @@ const field[2] G = [165406401235741561344368760387914828069717686894943870828336
 // Generator H (TODO: Generate this using a nothing up my sleeve setup)
 const field[2] H = [18088494987768362437108104365733457390180002882080199252891584927105189390906, 18851452430177667536696249872672129346900883028423229527829953506995373114404];
 
+
 // getPK is a function that multiplies a scalar with the group generator
 // receives the generator and the scalar 'x'
 // returns a (x,y) coordinate 
@@ -42,23 +41,27 @@ def getPk(field[2] generator, field x) -> field[2]{
     return multiply(xBits, generator, context);
 }
 
+// IsOnCurve checks if a point is on the curve
+// receives a point (as a field[2])
+// returns a true/false if the point is on the curve
 def IsOnCurve(field[2] point) -> bool {
     bool ok = onCurve(point, context);
     return ok;
 }
+
 
 // PedersenCommitment is a function that calculates a Pedersen commitment
 // receives a value 'v' and a random value 'r'
 // returns a Pedersen commitment on BabyJubJub
 def PedersenCommitment(field v, field r) -> field[2]{
 
-    // Calculate v*G
+    // calculate v*G
     field[2] vG = getPk(G, v);
 
-    // Calculate r*H 
+    // calculate r*H 
     field[2] rH = getPk(H, r);
 
-    // Calculate vG + rH
+    // calculate vG + rH
     field[2] commit = add(vG, rH, context);
     
     return commit;
@@ -73,7 +76,7 @@ def KnowledgeOfSK(field sk, field[2] pk) -> bool{
     // obtain public key from secret key
     field[2] publickey = getPk(G, sk);
 
-    // compare publickey and pk
+    // compare obtained publickey and passed pk
     bool ok = (publickey[0] == pk[0]) && (publickey[1] == pk[1]);
 
     return ok;
@@ -88,7 +91,6 @@ def SumPedersenCommits<N>(field[N][2] commits_list) -> field[2] {
     // initialize commitment variable
     field[2] mut result_commit = [0, 0];
     
-    
     for u32 i in 0..N {
         result_commit = add(result_commit, commits_list[i], context);
     }
@@ -101,78 +103,144 @@ def SumPedersenCommits<N>(field[N][2] commits_list) -> field[2] {
 // receives a previous commitment, a value 'v' and a random value 'r'
 // returns a true/false if the obtained commitment is equal to the passed one
 def CheckPedersenCommitmentEquality(field[2] commitment, field v, field r) -> bool {
-    
-    bool mut status  = false; 
 
     // Obtain Pedersen commitment
     field[2] commit = PedersenCommitment(v, r); 
 
     // Check if obtained commitment is status to the passed to the function
-    status = (commitment[0] == commit[0]) && (commitment[1] == commit[1]);
+    bool status = (commitment[0] == commit[0]) && (commitment[1] == commit[1]);
 
     return status;
 }
 
+// 
+def CheckPedersenCommitmentSetEquality<N>(field[N][2] commitment, field[N] v, field[N] r) -> bool {
+    
+    bool mut status  = true; 
+
+    for u32 i in 0..N {
+        // Obtain Pedersen commitment
+        field[2] obtained_commitment = PedersenCommitment(v[i], r[i]); 
+
+        // Check if obtained commitment is status to the passed to the function
+        status = status && (commitment[i][0] == obtained_commitment[0]) && (commitment[i][1] == obtained_commitment[1]);
+    }
+
+    return status;
+}
+
+// 
+def CheckPedersenCommitmentsOnCurve<N>(field[N][2] commitment, field[N] v, field[N] r) -> bool {
+    
+    bool mut status = true; 
+
+    for u32 i in 0..N {
+        // Obtain Pedersen commitment
+        field[2] obtained_commitment = PedersenCommitment(v[i], r[i]); 
+
+        // Check if obtained commitment is status to the passed to the function
+        status = status && (IsOnCurve(obtained_commitment));
+    }
+
+    return status;
+}
+   
 
 // CheckRange checks if a value 'v' in a Pedersen Commitment is within a given range
 // receives a range, a commitment, a value 'v' and a random value 'r'
 // returns a true/false if the value is within the range
 def CheckRange (field range, field[2] commitment, field v, field r) -> bool {
-
-    bool ok = true; 
-
-    bool mut status  = false; 
-    bool mut range_ok = false; 
-
+        
     // Check if obtained commitment is equal to the passed to the function
-    status = CheckPedersenCommitmentEquality(commitment, v, r); 
+    bool status_equality = CheckPedersenCommitmentEquality(commitment, v, r); 
 
     // Range Check
-    range_ok = if (v >= 0 && v < range) { true } else{ false };
+    bool status_range = if (v >= 0 && v < range) { true } else{ false };
 
-    // Check if operation status is ok
-    assert(status  == ok);
-    assert(range_ok == ok);
+    return status_range && status_equality;
+}
 
-    return status;
+// 
+def getInverse(field x) -> field {
+    
+    field p = 2736030358979909402780800718157159386076813972158567259200215660948447373041;
+
+    field inverse = p - x;
+
+    return inverse;
 }
 
 
-def main(u32 id, field[100][2] pk_list, field[100][2] commits_list, field[100][2] tx_commits_list, private field v, private field r, private field tx_v, private field tx_r, private field sk) {
+def main(
+    private u32 sender_id,                  // index of the person making the transaction
+    private u32[3] destination_id,          // Array of destination ids as it may be more than one
+    public  field[3][2] public_keys,        // List of public keys from smart contract on main chain
+    public  field[3][2] previous_commits,   // List of previous commitments from smart contract on main chain (this is the actual balance)
+    private field previous_v,               // previous balance of the commitment of the sender (to make sure he can open it)
+    private field previous_r,               // previous random value of the commitment of the sender (to make sure he can open it)
+    public  field[100][2] tx_commits,         // List of commitments for the transaction being made
+    private field[100] tx_values,           // List of values for the transaction being made
+    private field[100] tx_randoms,          // List of random values for the transaction being made
+    private field sk,                       // secret key of the sender (to prove that they own the funds)
+    private field v,                        // value of the transaction
+    private field[2] secrets                // array of the shared secrets with all the other entities in the system
+    ) {
 
+    // variable set to true just used for code cleanliness
     bool ok = true; 
 
-    // Check if the secret key corresponds to the public key
-    bool status_pk = KnowledgeOfSK(sk, pk_list[id]);
+    // Check if the public key is on the curve
+    bool status_curve = IsOnCurve(public_keys[sender_id]);
+    assert(status_curve == ok);
 
-    // check that Pedersen commitments of transaction add up to 0
-    field [2] resultx_commit = SumPedersenCommits(tx_commits_list);
+    // Check if the secret key corresponds to the public key for id
+    bool status_pk = KnowledgeOfSK(sk, public_keys[sender_id]);
+    assert(status_pk == ok);
 
-    // Calculate Pedersen commitment for tx
-    field[2] obtained_tx_commit = PedersenCommitment(tx_v, tx_r);
-    
-    // check if the Pedersen commitment of the transaction is equal to the obtained Pedersen commitment
-    bool status_tx_commit = (tx_commits_list[id][0] == obtained_tx_commit[0]) && (tx_commits_list[id][1] == obtained_tx_commit[1]);
+    // check if user can open the previous commitment
+    field[2] obtained_previous_commit = PedersenCommitment(previous_v, previous_r);
+    assert(obtained_previous_commit[0] == previous_commits[sender_id][0] && obtained_previous_commit[1] == previous_commits[sender_id][1]);
 
-    // Check if operation status is ok
-    assert (status_tx_commit == ok);
-
-    // Range Check
-    bool status_range = CheckRange(v, commits_list[id], tx_v, r);
-
-    // Check if operation status is ok
+    // check if user has enough value to send (aka range check)
+    bool status_range = if (previous_v >= v) { true } else { false };
     assert(status_range == ok);
 
+    //bool status_range = CheckRange(previous_v, commits_list[sender_id], v[id], r[id]);
+
+    // check that Pedersen commitments of transaction add up to 0, which is point (0, 1)
+    field [2] tx_commit_sum = SumPedersenCommits(tx_commits);
+    //assert(tx_commit_sum[0] == 0 && tx_commit_sum[1] == 1);
+ 
+
+    // calculate the random values for the Pedersen commitments of the transaction
+
+    // TODO: update this value
+    field r = 123456789;
+
+    // calculate Pedersen commitment for tx and check if sender sent the correct one (to a proper negative value)
+    field[2] obtained_tx_commit = PedersenCommitment(getInverse(v), r);
+    assert(obtained_tx_commit[0] == tx_commits[sender_id][0] && obtained_tx_commit[1] == tx_commits[sender_id][1]);
+
+
+    //field[2] obtained_dest_tx_commit = PedersenCommitment(v, getInverse(r[destination_id]));
+
+    // TODO: Fix the index of this array
+    //field[2] obtained_extra_tx_commit = PedersenCommitment(0, r[1]);
+
+    
+    // check if the Pedersen commitment of the transaction is equal to the obtained Pedersen commitment
+    bool status_tx_commit = CheckPedersenCommitmentSetEquality(tx_commits, tx_values, tx_randoms);
+    assert(status_tx_commit == ok);
+
+
+
     return ;
-
-
-
-
-    // bank id (array index)
-    // list of pk_list (for transactions)
-    // list of commits_list with each pk 
-    // R token (for audit) [probably not needed]
-    // v - unencrypted value
-
-    // 
 }
+
+
+// TODO LIST
+
+// TODO: Check that person sending the tx knows how to open all commitments (i.e., pass an array of values and an array of random values)
+// TODO: Code the transparent setup for generator H
+// TODO: Fix the malleability and replay attack
+// tbd
