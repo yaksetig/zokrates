@@ -173,14 +173,14 @@ def getInverse(field x) -> field {
 
 def main(
     private u32 sender_id,                  // index of the person making the transaction
-    private u32[3] destination_id,          // Array of destination ids as it may be more than one
-    public  field[3][2] public_keys,        // List of public keys from smart contract on main chain
-    public  field[3][2] previous_commits,   // List of previous commitments from smart contract on main chain (this is the actual balance)
+    private u32[3] destination_id,          // array of destination ids as it may be more than one
+    public  field[3][2] public_keys,        // list of public keys from smart contract on main chain
+    public  field[3][2] previous_commits,   // list of previous commitments from smart contract on main chain (this is the actual balance)
     private field previous_v,               // previous balance of the commitment of the sender (to make sure he can open it)
     private field previous_r,               // previous random value of the commitment of the sender (to make sure he can open it)
-    public  field[100][2] tx_commits,         // List of commitments for the transaction being made
-    private field[100] tx_values,           // List of values for the transaction being made
-    private field[100] tx_randoms,          // List of random values for the transaction being made
+    public  field[100][2] tx_commits,       // list of commitments for the transaction being made
+    private field[100] tx_values,           // list of values for the transaction being made
+    private field[100] tx_randoms,          // list of random values for the transaction being made
     private field sk,                       // secret key of the sender (to prove that they own the funds)
     private field v,                        // value of the transaction
     private field[2] secrets                // array of the shared secrets with all the other entities in the system
