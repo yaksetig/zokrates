@@ -306,7 +306,7 @@ def main(
     public  field[B][2] tx_commits,  // list of commitments for the transaction being made
     private field[B] tx_values,      // list of values for the transaction being made
     private field[B] tx_randoms,     // list of random values for the transaction being made
-    private field[B] s,              // value of the transaction
+    private field[B] s,              // array of secrets established between participants
     public  field   block_header     // block header 
     ) {
 
