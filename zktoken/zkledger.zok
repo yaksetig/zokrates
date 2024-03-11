@@ -365,6 +365,6 @@ def main(
 // TODO LIST
 
  // Next steps:
-// TODO: Check that person sending the tx knows how to open all commitments (i.e., pass an array of values and an array of random values)
-// TODO: Code the transparent setup for generator H
-// TODO: Fix the malleability and replay attack
+// TODO: Check that person sending the tx knows how to open all commitments (this is done, but not integrated)
+// TODO: Code the transparent setup for generator H (this is easy, just not a priority rn)
+// TODO: Fix the malleability and replay attack (This is solved by sender properly signing the input tx)
