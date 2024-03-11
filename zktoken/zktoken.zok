@@ -285,6 +285,7 @@ def main(
     // check if user knows the secret key to the public key making the transfer
     bool status_pk = KnowledgeOfSK(sk, pk);
 
+
     // check if user can open the previous commitment (i.e., if he knows the balance (v) and the random value (r))
     bool commits_ok = (previous_commit == PedersenCommitment(previous_v, previous_r));
 
@@ -293,10 +294,11 @@ def main(
     bool status_range = (previous_v >= v);
 
 
-    // check if the transaction is a credit or a debit
-    bool status_credit = if (status_pk == true) {false}  else {true};
-    bool status_debit =  if (status_pk == true) {true} else {false};
+    // assign variables to determine if the transaction is a credit or a debit
+    bool status_credit = if (status_pk == true) {false} else {true};
+    bool status_debit  = if (status_pk == true) {true}  else {false};
 
+    // this is either a successful credit or debit
     assert(status_credit || status_debit);
 
     // check if random value is well-formed
@@ -318,15 +320,11 @@ def main(
     // this is either a successful credit or debit
     assert(credit_ok || debit_ok);
 
-    //bool mut part_1 = (status_curve && status_pk && status_range && (obtained_previous_commit == previous_commits) && (obtained_tx_commit == tx_commits[sender_id]));
-
     return ;
 }
 
 
 // TODO LIST
 
- // Next steps:
-// TODO: Check that person sending the tx knows how to open all commitments (this is done, but not integrated)
 // TODO: Code the transparent setup for generator H (this is easy, just not a priority rn)
 // TODO: Fix the malleability and replay attack (This is solved by sender properly signing the input tx)
