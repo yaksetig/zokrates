@@ -1,5 +1,6 @@
 import "hashes/sha256/512bitPacked" as sha256packed;
 
+// number of merkle tree leaves
 const u32 N = 3;
 
 
